@@ -1,1 +1,305 @@
-{"title":"Math Libraries in Uniswap V4","id":"9IVZAhZlDOFkyOgXDgjE7sdwYVYKG8AiA37uSQxgurY=","steps":[{"type":"textOnly","description":"Welcome to our deep dive into the optimization libraries of **Uniswap V4**! In decentralized finance (DeFi), precise and efficient mathematical operations are crucial for accurate pricing, minimal slippage, and gas optimization. **Uniswap V4** relies on three key libraries to achieve these goals:\n\n1. `SafeCast`: Ensures type safety during conversions, preventing overflow/underflow errors.\n2. `FullMath`: Provides high-precision calculations for complex operations like liquidity calculations.\n3. `UnsafeMath`: Offers gas-efficient operations for scenarios where safety checks are handled externally.\n\nThroughout this tour, we'll examine how these libraries contribute to **Uniswap V4**'s performance, reliability, and security. You'll gain insights into the mathematical foundations that power one of the leading DeFi protocols. Let's begin our exploration!","title":"","id":"2995"},{"type":"revealFiles","files":["src/libraries/SafeCast.sol"],"description":"The `SafeCast` library provides functions for safely casting between different integer types. It includes checks to prevent overflow and underflow during type conversions, which is crucial for maintaining numerical integrity in smart contracts. Notice how each function includes a check and reverts with a custom error if an overflow or underflow would occur.","title":"","id":"2996"},{"type":"highlight","description":"Let's look at the `toUint160` function as an example. This function safely converts a `uint256` to a `uint160`, which is commonly used in `Uniswap` for representing square root prices. The function includes a check to ensure the conversion doesn't result in data loss.","file":"src/libraries/SafeCast.sol","highlight":[{"start":16,"end":19}],"title":"","id":"2997"},{"type":"revealFiles","files":["src/libraries/FullMath.sol"],"description":"The `FullMath` library provides high-precision mathematical operations for 512-bit arithmetic. This library is essential for Uniswap V4's core functionality, especially in price calculations and liquidity management. It handles complex scenarios like **phantom overflow** where intermediate values can exceed 256 bits without losing precision.","title":"","id":"2998"},{"type":"highlight","description":"The `mulDiv` function is a cornerstone of `FullMath`. It calculates (a * b / denominator) with full precision, handling cases where intermediate results might overflow standard 256-bit integers. Let's break down this complex function into smaller parts.","file":"src/libraries/FullMath.sol","highlight":[{"start":14,"end":15}],"title":"","id":"3004"},{"type":"highlight","description":"The function begins by performing a 512-bit multiplication of `a` and `b`. The result is stored in two 256-bit variables: `prod0` (least significant bits) and `prod1` (most significant bits). This allows handling of results that exceed 256 bits.","file":"src/libraries/FullMath.sol","highlight":[{"start":16,"end":26}],"title":"","id":"3005"},{"type":"highlight","description":"After the **multiplication**, the **function** checks if the **result** can be handled by standard 256-bit **division**. If `prod1` is zero, it means no **overflow** occurred, and a simple **division** is performed. This optimization handles common cases efficiently.","file":"src/libraries/FullMath.sol","highlight":[{"start":28,"end":38}],"title":"","id":"3006"},{"type":"highlight","description":"For cases where `prod1` is not zero, the function performs a **512 by 256** division. It first makes the division exact by subtracting the remainder from the product. This step is crucial for maintaining precision in the final result.","file":"src/libraries/FullMath.sol","highlight":[{"start":40,"end":54}],"title":"","id":"3007"},{"type":"highlight","description":"The function then optimizes the division by **factoring out powers of two** from the denominator. This step **simplifies the subsequent calculations** and **improves efficiency**.","file":"src/libraries/FullMath.sol","highlight":[{"start":56,"end":75}],"title":"","id":"3008"},{"type":"highlight","description":"Finally, the function calculates the modular inverse of the denominator using the Newton-Raphson method. This allows the division to be performed as a multiplication, which is more efficient. The result is then computed and returned.","file":"src/libraries/FullMath.sol","highlight":[{"start":77,"end":101}],"title":"","id":"3009"},{"type":"revealFiles","files":["src/libraries/UnsafeMath.sol"],"description":"**UnsafeMath** prioritizes gas efficiency over built-in safety checks. Key points:\n\n1. Used in controlled environments with known input ranges.\n2. Crucial for gas optimization in hot paths like swap calculations.\n3. Requires careful auditing of calling code to ensure safety.\n\nIn **Uniswap V4**, **UnsafeMath** reduces gas costs but demands meticulous review. Auditors must scrutinize its usage, ensuring proper bounds checking in surrounding code to prevent potential vulnerabilities.","title":"","id":"3000"},{"type":"highlight","description":"The `divRoundingUp` function in `UnsafeMath` demonstrates a key optimization in Uniswap V4. Unlike `SafeMath` libraries that include overflow checks, `UnsafeMath` prioritizes **gas efficiency**. This function uses inline assembly to perform ceiling division without safety checks, potentially saving 5000-10000 gas per operation compared to safe alternatives. However, this efficiency comes with risks: if inputs aren't validated externally, it could lead to unexpected results or vulnerabilities. Uniswap V4 uses `UnsafeMath` in controlled environments where input ranges are known and checked elsewhere in the codebase. This approach balances performance with **security**, a crucial consideration in high-volume DeFi protocols.","file":"src/libraries/UnsafeMath.sol","highlight":[{"start":12,"end":16}],"title":"","id":"3001"},{"type":"highlight","description":"The `SwapMath` library is a crucial component of Uniswap V4, responsible for computing swap results within tick ranges. It combines precision and efficiency by leveraging `FullMath` and `SqrtPriceMath` (which uses `UnsafeMath`). Let's examine its structure and key functions.","file":"src/libraries/SwapMath.sol","highlight":[{"start":1,"end":9}],"title":"","id":"3161"},{"type":"highlight","description":"The `SwapMath` library imports `FullMath` for high-precision calculations and `SqrtPriceMath` for efficient square root price computations. These imports are crucial for balancing precision and gas efficiency in swap calculations.","file":"src/libraries/SwapMath.sol","highlight":[{"start":3,"end":5}],"title":"","id":"3162"},{"type":"highlight","description":"The `MAX_SWAP_FEE` constant is defined as `1e6`, representing 100% in hundredths of a bip. This constant is used as an upper bound for swap fees, ensuring that fees never exceed 100% of the swap amount.","file":"src/libraries/SwapMath.sol","highlight":[{"start":10,"end":12}],"title":"","id":"3163"},{"type":"highlight","description":"The `getSqrtPriceTarget` function computes the square root price target for the next swap step. It takes into account the swap direction and price limits to determine the optimal price target.","file":"src/libraries/SwapMath.sol","highlight":[{"start":14,"end":24}],"title":"","id":"3164"},{"type":"highlight","description":"Inside `getSqrtPriceTarget`, inline assembly is used for gas-efficient calculations. It determines the price target based on the swap direction (`zeroForOne`) and the relationship between `sqrtPriceNextX96` and `sqrtPriceLimitX96`.","file":"src/libraries/SwapMath.sol","highlight":[{"start":25,"end":36}],"title":"","id":"3165"},{"type":"highlight","description":"The `computeSwapStep` function is crucial for Uniswap V4's swap logic. Let's examine some key points from its documentation:\n\n1. It handles both exact input and exact output swaps (note the comment about negative `amountSpecified`).\n2. The function considers current price, target price, liquidity, and fees in its calculations.\n3. It returns the new sqrt price, amounts in and out, and the fee amount.\n4. There's an important constraint on `feePips`: it must not exceed `MAX_SWAP_FEE`.\n\nAs an auditor, pay special attention to how these aspects are implemented and any potential edge cases.","file":"src/libraries/SwapMath.sol","highlight":[{"start":39,"end":57}],"title":"","id":"3166"},{"type":"highlight","description":"At the start of `computeSwapStep`, the function determines the swap direction (`zeroForOne`) and whether it's an exact input swap (`exactIn`). These flags guide the subsequent calculations.","file":"src/libraries/SwapMath.sol","highlight":[{"start":58,"end":61}],"title":"","id":"3167"},{"type":"highlight","description":"For exact input swaps, the function calculates the input amount after fees using `FullMath.mulDiv`. It then computes the amount in based on the price range and liquidity using `SqrtPriceMath` functions.","file":"src/libraries/SwapMath.sol","highlight":[{"start":63,"end":75}],"title":"","id":"3168"},{"type":"highlight","description":"For exact output swaps, the function first calculates the output amount based on the price range and liquidity. It then determines the input amount and calculates the fee using `FullMath.mulDivRoundingUp`.","file":"src/libraries/SwapMath.sol","highlight":[{"start":87,"end":105}],"title":"","id":"3169"},{"type":"highlight","description":"Here we see the import statements for `FullMath` and `SqrtPriceMath`. `SqrtPriceMath`, in turn, uses `UnsafeMath`. This setup allows `SwapMath` to leverage both high-precision and gas-efficient calculations.","file":"src/libraries/SwapMath.sol","highlight":[{"start":1,"end":9}],"title":"","id":"3011"},{"type":"highlight","description":"Let's look at the `computeSwapStep` function, which is a core part of the swap logic. This function uses `FullMath.mulDiv` for precise calculations of liquidity and amounts during a swap.","file":"src/libraries/SwapMath.sol","highlight":[{"start":20,"end":30}],"title":"","id":"3012"},{"type":"highlight","description":"Within `computeSwapStep`, we see a call to `SqrtPriceMath.getNextSqrtPriceFromInput`. This function utilizes `UnsafeMath` for efficient price calculations, demonstrating how `SwapMath` balances **precision** and **gas efficiency**.","file":"src/libraries/SwapMath.sol","highlight":[{"start":31,"end":40}],"title":"","id":"3013"},{"type":"textOnly","description":"`SafeCast`, `FullMath`, and `UnsafeMath` form the mathematical core of Uniswap V4:\n\n- `SafeCast` ensures type safety\n- `FullMath` provides high-precision calculations\n- `UnsafeMath` offers gas-efficient operations\n\nTheir synergy enables precise, efficient, and secure decentralized trading. The careful implementation and strategic use of these **libraries** are fundamental to Uniswap V4's performance and reliability.","title":"","id":"3003"}]}
+{
+  "title": "Math Libraries in Uniswap V4",
+  "id": "9IVZAhZlDOFkyOgXDgjE7sdwYVYKG8AiA37uSQxgurY=",
+  "steps": [
+    {
+      "type": "textOnly",
+      "description": "Welcome to our deep dive into the optimization libraries of **Uniswap V4**! In decentralized finance (DeFi), precise and efficient mathematical operations are crucial for accurate pricing, minimal slippage, and gas optimization. **Uniswap V4** relies on three key libraries to achieve these goals:\n\n1. `SafeCast`: Ensures type safety during conversions, preventing overflow/underflow errors.\n2. `FullMath`: Provides high-precision calculations for complex operations like liquidity calculations.\n3. `UnsafeMath`: Offers gas-efficient operations for scenarios where safety checks are handled externally.\n\nThroughout this tour, we'll examine how these libraries contribute to **Uniswap V4**'s performance, reliability, and security. You'll gain insights into the mathematical foundations that power one of the leading DeFi protocols. Let's begin our exploration!",
+      "title": "",
+      "id": "2995"
+    },
+    {
+      "type": "revealFiles",
+      "files": [
+        "src/libraries/SafeCast.sol"
+      ],
+      "description": "The `SafeCast` library provides functions for safely casting between different integer types. It includes checks to prevent overflow and underflow during type conversions, which is crucial for maintaining numerical integrity in smart contracts. Notice how each function includes a check and reverts with a custom error if an overflow or underflow would occur.",
+      "title": "",
+      "id": "2996"
+    },
+    {
+      "type": "highlight",
+      "description": "Let's look at the `toUint160` function as an example. This function safely converts a `uint256` to a `uint160`, which is commonly used in `Uniswap` for representing square root prices. The function includes a check to ensure the conversion doesn't result in data loss.",
+      "file": "src/libraries/SafeCast.sol",
+      "highlight": [
+        {
+          "start": 16,
+          "end": 19
+        }
+      ],
+      "title": "",
+      "id": "2997"
+    },
+    {
+      "type": "revealFiles",
+      "files": [
+        "src/libraries/FullMath.sol"
+      ],
+      "description": "The `FullMath` library provides high-precision mathematical operations for 512-bit arithmetic. This library is essential for Uniswap V4's core functionality, especially in price calculations and liquidity management. It handles complex scenarios like **phantom overflow** where intermediate values can exceed 256 bits without losing precision.",
+      "title": "",
+      "id": "2998"
+    },
+    {
+      "type": "highlight",
+      "description": "The `mulDiv` function is a cornerstone of `FullMath`. It calculates (a * b / denominator) with full precision, handling cases where intermediate results might overflow standard 256-bit integers. Let's break down this complex function into smaller parts. \n\n Note: This function is infamously tricky. For a fuller explanation, see https://x.com/0xjimmyk/status/1833811963954319723 or https://xn--2-umb.com/21/muldiv/",
+      "file": "src/libraries/FullMath.sol",
+      "highlight": [
+        {
+          "start": 14,
+          "end": 15
+        }
+      ],
+      "title": "",
+      "id": "3004"
+    },
+    {
+      "type": "highlight",
+      "description": "The function begins by performing a 512-bit multiplication of `a` and `b`. The result is stored in two 256-bit variables: `prod0` (least significant bits) and `prod1` (most significant bits). This allows handling of results that exceed 256 bits.",
+      "file": "src/libraries/FullMath.sol",
+      "highlight": [
+        {
+          "start": 16,
+          "end": 26
+        }
+      ],
+      "title": "",
+      "id": "3005"
+    },
+    {
+      "type": "highlight",
+      "description": "After the **multiplication**, the **function** checks if the **result** can be handled by standard 256-bit **division**. If `prod1` is zero, it means no **overflow** occurred, and a simple **division** is performed. This optimization handles common cases efficiently.",
+      "file": "src/libraries/FullMath.sol",
+      "highlight": [
+        {
+          "start": 28,
+          "end": 38
+        }
+      ],
+      "title": "",
+      "id": "3006"
+    },
+    {
+      "type": "highlight",
+      "description": "For cases where `prod1` is not zero, the function performs a **512 by 256** division. It first makes the division exact by subtracting the remainder from the product. This step is crucial for maintaining precision in the final result.",
+      "file": "src/libraries/FullMath.sol",
+      "highlight": [
+        {
+          "start": 40,
+          "end": 54
+        }
+      ],
+      "title": "",
+      "id": "3007"
+    },
+    {
+      "type": "highlight",
+      "description": "The function then optimizes the division by **factoring out powers of two** from the denominator. This step **simplifies the subsequent calculations** and **improves efficiency**.",
+      "file": "src/libraries/FullMath.sol",
+      "highlight": [
+        {
+          "start": 56,
+          "end": 75
+        }
+      ],
+      "title": "",
+      "id": "3008"
+    },
+    {
+      "type": "highlight",
+      "description": "Finally, the function calculates the modular inverse of the denominator using the Newton-Raphson method. This allows the division to be performed as a multiplication, which is more efficient. The result is then computed and returned.",
+      "file": "src/libraries/FullMath.sol",
+      "highlight": [
+        {
+          "start": 77,
+          "end": 101
+        }
+      ],
+      "title": "",
+      "id": "3009"
+    },
+    {
+      "type": "revealFiles",
+      "files": [
+        "src/libraries/UnsafeMath.sol"
+      ],
+      "description": "**UnsafeMath** prioritizes gas efficiency over built-in safety checks. Key points:\n\n1. Used in controlled environments with known input ranges.\n2. Crucial for gas optimization in hot paths like swap calculations.\n3. Requires careful auditing of calling code to ensure safety.\n\nIn **Uniswap V4**, **UnsafeMath** reduces gas costs but demands meticulous review. Auditors must scrutinize its usage, ensuring proper bounds checking in surrounding code to prevent potential vulnerabilities.",
+      "title": "",
+      "id": "3000"
+    },
+    {
+      "type": "highlight",
+      "description": "The `divRoundingUp` function in `UnsafeMath` demonstrates a key optimization in Uniswap V4. Unlike `SafeMath` libraries that include overflow checks, `UnsafeMath` prioritizes **gas efficiency**. This function uses inline assembly to perform ceiling division without safety checks, potentially saving 5000-10000 gas per operation compared to safe alternatives. However, this efficiency comes with risks: if inputs aren't validated externally, it could lead to unexpected results or vulnerabilities. Uniswap V4 uses `UnsafeMath` in controlled environments where input ranges are known and checked elsewhere in the codebase. This approach balances performance with **security**, a crucial consideration in high-volume DeFi protocols.",
+      "file": "src/libraries/UnsafeMath.sol",
+      "highlight": [
+        {
+          "start": 12,
+          "end": 16
+        }
+      ],
+      "title": "",
+      "id": "3001"
+    },
+    {
+      "type": "highlight",
+      "description": "The `SwapMath` library is a crucial component of Uniswap V4, responsible for computing swap results within tick ranges. It combines precision and efficiency by leveraging `FullMath` and `SqrtPriceMath` (which uses `UnsafeMath`). Let's examine its structure and key functions.",
+      "file": "src/libraries/SwapMath.sol",
+      "highlight": [
+        {
+          "start": 1,
+          "end": 9
+        }
+      ],
+      "title": "",
+      "id": "3161"
+    },
+    {
+      "type": "highlight",
+      "description": "The `SwapMath` library imports `FullMath` for high-precision calculations and `SqrtPriceMath` for efficient square root price computations. These imports are crucial for balancing precision and gas efficiency in swap calculations.",
+      "file": "src/libraries/SwapMath.sol",
+      "highlight": [
+        {
+          "start": 3,
+          "end": 5
+        }
+      ],
+      "title": "",
+      "id": "3162"
+    },
+    {
+      "type": "highlight",
+      "description": "The `MAX_SWAP_FEE` constant is defined as `1e6`, representing 100% in hundredths of a bip. This constant is used as an upper bound for swap fees, ensuring that fees never exceed 100% of the swap amount.",
+      "file": "src/libraries/SwapMath.sol",
+      "highlight": [
+        {
+          "start": 10,
+          "end": 12
+        }
+      ],
+      "title": "",
+      "id": "3163"
+    },
+    {
+      "type": "highlight",
+      "description": "The `getSqrtPriceTarget` function computes the square root price target for the next swap step. It takes into account the swap direction and price limits to determine the optimal price target.",
+      "file": "src/libraries/SwapMath.sol",
+      "highlight": [
+        {
+          "start": 14,
+          "end": 24
+        }
+      ],
+      "title": "",
+      "id": "3164"
+    },
+    {
+      "type": "highlight",
+      "description": "Inside `getSqrtPriceTarget`, inline assembly is used for gas-efficient calculations. It determines the price target based on the swap direction (`zeroForOne`) and the relationship between `sqrtPriceNextX96` and `sqrtPriceLimitX96`.",
+      "file": "src/libraries/SwapMath.sol",
+      "highlight": [
+        {
+          "start": 25,
+          "end": 36
+        }
+      ],
+      "title": "",
+      "id": "3165"
+    },
+    {
+      "type": "highlight",
+      "description": "The `computeSwapStep` function is crucial for Uniswap V4's swap logic. Let's examine some key points from its documentation:\n\n1. It handles both exact input and exact output swaps (note the comment about negative `amountSpecified`).\n2. The function considers current price, target price, liquidity, and fees in its calculations.\n3. It returns the new sqrt price, amounts in and out, and the fee amount.\n4. There's an important constraint on `feePips`: it must not exceed `MAX_SWAP_FEE`.\n\nAs an auditor, pay special attention to how these aspects are implemented and any potential edge cases.",
+      "file": "src/libraries/SwapMath.sol",
+      "highlight": [
+        {
+          "start": 39,
+          "end": 57
+        }
+      ],
+      "title": "",
+      "id": "3166"
+    },
+    {
+      "type": "highlight",
+      "description": "At the start of `computeSwapStep`, the function determines the swap direction (`zeroForOne`) and whether it's an exact input swap (`exactIn`). These flags guide the subsequent calculations.",
+      "file": "src/libraries/SwapMath.sol",
+      "highlight": [
+        {
+          "start": 58,
+          "end": 61
+        }
+      ],
+      "title": "",
+      "id": "3167"
+    },
+    {
+      "type": "highlight",
+      "description": "For exact input swaps, the function calculates the input amount after fees using `FullMath.mulDiv`. It then computes the amount in based on the price range and liquidity using `SqrtPriceMath` functions.",
+      "file": "src/libraries/SwapMath.sol",
+      "highlight": [
+        {
+          "start": 63,
+          "end": 75
+        }
+      ],
+      "title": "",
+      "id": "3168"
+    },
+    {
+      "type": "highlight",
+      "description": "For exact output swaps, the function first calculates the output amount based on the price range and liquidity. It then determines the input amount and calculates the fee using `FullMath.mulDivRoundingUp`.",
+      "file": "src/libraries/SwapMath.sol",
+      "highlight": [
+        {
+          "start": 87,
+          "end": 105
+        }
+      ],
+      "title": "",
+      "id": "3169"
+    },
+    {
+      "type": "highlight",
+      "description": "Here we see the import statements for `FullMath` and `SqrtPriceMath`. `SqrtPriceMath`, in turn, uses `UnsafeMath`. This setup allows `SwapMath` to leverage both high-precision and gas-efficient calculations.",
+      "file": "src/libraries/SwapMath.sol",
+      "highlight": [
+        {
+          "start": 1,
+          "end": 9
+        }
+      ],
+      "title": "",
+      "id": "3011"
+    },
+    {
+      "type": "highlight",
+      "description": "Let's look at the `computeSwapStep` function, which is a core part of the swap logic. This function uses `FullMath.mulDiv` for precise calculations of liquidity and amounts during a swap.",
+      "file": "src/libraries/SwapMath.sol",
+      "highlight": [
+        {
+          "start": 20,
+          "end": 30
+        }
+      ],
+      "title": "",
+      "id": "3012"
+    },
+    {
+      "type": "highlight",
+      "description": "Within `computeSwapStep`, we see a call to `SqrtPriceMath.getNextSqrtPriceFromInput`. This function utilizes `UnsafeMath` for efficient price calculations, demonstrating how `SwapMath` balances **precision** and **gas efficiency**.",
+      "file": "src/libraries/SwapMath.sol",
+      "highlight": [
+        {
+          "start": 31,
+          "end": 40
+        }
+      ],
+      "title": "",
+      "id": "3013"
+    },
+    {
+      "type": "textOnly",
+      "description": "`SafeCast`, `FullMath`, and `UnsafeMath` form the mathematical core of Uniswap V4:\n\n- `SafeCast` ensures type safety\n- `FullMath` provides high-precision calculations\n- `UnsafeMath` offers gas-efficient operations\n\nTheir synergy enables precise, efficient, and secure decentralized trading. The careful implementation and strategic use of these **libraries** are fundamental to Uniswap V4's performance and reliability.",
+      "title": "",
+      "id": "3003"
+    }
+  ]
+}
